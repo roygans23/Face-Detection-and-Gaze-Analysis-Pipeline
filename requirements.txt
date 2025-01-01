@@ -1,0 +1,11 @@
+opencv-python
+numpy
+matplotlib
+seaborn
+pandas
+jsonschema
+torch
+torchvision
+facenet-pytorch
+scikit-learn
+pillow
