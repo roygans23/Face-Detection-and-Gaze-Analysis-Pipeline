@@ -42,7 +42,7 @@ def create_dataloaders(data_dir, batch_size=32):
     return train_loader, val_loader
 
 
-def create_model(num_classes=2, device='cpu'):
+def create_model(num_classes=48, device='cpu'):
     """
     Loads a pre-trained VGG16 and modifies the final layer to match num_classes.
     """

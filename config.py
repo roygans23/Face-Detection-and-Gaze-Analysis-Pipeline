@@ -7,13 +7,14 @@ DATA_DIR = "data"
 VIDEO_FOLDER = "data/videos"
 JSON_FOLDER = "data/jsons"
 FACES_FOLDER = "data/faces"
-ACTORS_READY_FOLDER = "data/dataset"
+ACTORS_READY_FOLDER = "data/actors_ready"
 AUGMENTED_FOLDER = "data/actors_ready_augmented"
-DATASET_DIR = "data/dataset"
+CSV_FOLDER = "data/videos_csv"
+
 
 # --- MODEL FILES (EDIT THESE TO MATCH YOUR SYSTEM) ---
-PROTOTXT_PATH = r"C:\Users\IsarShmueli\Korean_Modulate\deploy.prototxt.txt"
-CAFFE_MODEL_PATH = r"C:\Users\IsarShmueli\Korean_Modulate\res10_300x300_ssd_iter_140000.caffemodel"
+PROTOTXT_PATH = r"C:\Users\IsarShmueli\Korean_Modulate\utils\deploy.prototxt.txt"
+CAFFE_MODEL_PATH = r"C:\Users\IsarShmueli\Korean_Modulate\utils\res10_300x300_ssd_iter_140000.caffemodel"
 
 # --- FACE DETECTION THRESHOLDS ---
 CONF_THRESHOLD = 0.7
@@ -22,7 +23,7 @@ FRAME_SKIP = 60
 
 # --- FEATURE EXTRACTION ---
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-THRESHOLD = 0.9  # Similarity threshold for matching
+THRESHOLD = 0.75  # Similarity threshold for matching
 
 # --- TRAINING PARAMETERS ---
 NUM_CLASSES = 48

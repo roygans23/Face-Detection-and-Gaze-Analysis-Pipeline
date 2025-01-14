@@ -50,6 +50,7 @@ def main():
 
     # 5. Feature extraction: Build embeddings for known actors
     actor_embeddings = generate_actor_embeddings(config.ACTORS_READY_FOLDER)
+    print(f"Number of actor embeddings generated: {len(actor_embeddings)}")
 
     # 6. Match & move faces
     match_and_move_faces(
@@ -67,29 +68,29 @@ def main():
         num_augmented=3
     )
 
-    # 8. Training process
-    train_loader, val_loader = create_dataloaders(
-        data_dir=config.DATASET_DIR,
-        batch_size=config.BATCH_SIZE
-    )
+    # # 8. Training process
+    # train_loader, val_loader = create_dataloaders(
+    #     data_dir=config.ACTORS_READY_FOLDER,
+    #     batch_size=config.BATCH_SIZE
+    # )
 
-    model = create_model(num_classes=config.NUM_CLASSES, device=config.DEVICE)
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
+    # model = create_model(num_classes=config.NUM_CLASSES, device=config.DEVICE)
+    # criterion = torch.nn.CrossEntropyLoss()
+    # optimizer = torch.optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
 
-    trained_model = train_model(
-        model, 
-        criterion, 
-        optimizer, 
-        train_loader, 
-        val_loader, 
-        device=config.DEVICE, 
-        num_epochs=config.NUM_EPOCHS
-    )
+    # trained_model = train_model(
+    #     model, 
+    #     criterion, 
+    #     optimizer, 
+    #     train_loader, 
+    #     val_loader, 
+    #     device=config.DEVICE, 
+    #     num_epochs=config.NUM_EPOCHS
+    # )
 
-    # 9. Save the trained model
-    torch.save(trained_model.state_dict(), "fine_tuned_vgg16.pth")
-    print("Model saved as fine_tuned_vgg16.pth")
+    # # 9. Save the trained model
+    # torch.save(trained_model.state_dict(), "fine_tuned_vgg16.pth")
+    # print("Model saved as fine_tuned_vgg16.pth")
 
 if __name__ == "__main__":
     main()
