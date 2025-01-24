@@ -100,7 +100,7 @@ def generate_actor_embeddings(actors_ready_folder):
 
 def find_best_match(face_embedding, actor_embeddings, threshold=0.9):
     """
-    Finds the best-matching actor. Returns (best_actor, best_similarity) or (None, best_similarity) if below threshold.
+    Finds the best-matching actor. Always returns (best_actor, best_similarity).
     """
     best_similarity = -1.0
     best_actor = None
@@ -116,68 +116,81 @@ def find_best_match(face_embedding, actor_embeddings, threshold=0.9):
             best_similarity = sim
             best_actor = actor_name
 
-    if best_similarity >= threshold:
-        return best_actor, best_similarity
-    else:
-        return None, best_similarity
+    # Always return the best actor, even if similarity is below threshold
+    return best_actor, best_similarity
 
 def match_and_move_faces(faces_folder, actors_ready_folder, actor_embeddings, threshold=0.9):
     """
-    Recursively matches each face in `faces_folder` (including subfolders) to the best actor (above `threshold`)
-    and moves it to that actor's folder.
-    If no match is found, moves the file to an "unknown" folder in the same directory as faces_folder.
+    Recursively matches each face in `faces_folder` (including subfolders) to the best actor.
+    Only moves images that meet the similarity threshold requirement.
+    Images below threshold are left in their original location.
     """
-    
-    # Create the "unknown" folder in the same directory as faces_folder
-    unknown_dir = os.path.join(faces_folder, 'unknown')
-    os.makedirs(unknown_dir, exist_ok=True)
-    print(f"Unknown directory ensured at: {unknown_dir}")
-    
-    # Traverse all subdirectories and files within faces_folder
     for root, dirs, files in os.walk(faces_folder):
-        # Skip the 'unknown' directory to prevent re-processing moved files
         dirs[:] = [d for d in dirs if d.lower() != 'unknown']
         
         for file in files:
             if not file.lower().endswith(('.png', '.jpg', '.jpeg')):
                 print(f"Skipping non-image file: {file}")
-                continue  # Skip non-image files
+                continue
             
             face_image_path = os.path.join(root, file)
             
-            # Extract face from the image
             face = extract_aligned_face(face_image_path)
             if face is None:
                 print(f"No face extracted from: {face_image_path}. Skipping.")
-                continue  # Skip if no face is detected
+                continue
             
-            # Generate face embedding
             face_embedding = generate_embedding(face)
             if face_embedding is None:
                 print(f"Failed to generate embedding for: {face_image_path}. Skipping.")
-                continue  # Skip if embedding generation fails
+                continue
             
-            # Find best match from actor embeddings
-            best_actor, best_similarity = find_best_match(face_embedding, actor_embeddings, threshold)
+            # Get best match and check against threshold
+            best_actor, best_similarity = find_best_match(face_embedding, actor_embeddings)
             
-            if best_actor is not None:
-                # We have a match above the threshold; move the file to best_actor's folder
+            # Only move files that meet the threshold requirement
+            if best_similarity >= threshold:
                 actor_dir = os.path.join(actors_ready_folder, best_actor)
                 os.makedirs(actor_dir, exist_ok=True)
                 
-                # To prevent filename conflicts, append a timestamp to the filename
                 timestamp = int(time.time())
                 new_filename = f"{os.path.splitext(file)[0]}_{timestamp}{os.path.splitext(file)[1]}"
                 destination_path = os.path.join(actor_dir, new_filename)
                 
                 shutil.move(face_image_path, destination_path)
+                print(f"Moved {file} to {best_actor} (similarity: {best_similarity:.3f})")
             else:
-                # No match found above threshold, move image to "unknown" folder
-                # To prevent filename conflicts, append a timestamp to the filename
-                timestamp = int(time.time())
-                new_filename = f"{os.path.splitext(file)[0]}_{timestamp}{os.path.splitext(file)[1]}"
-                destination_path = os.path.join(unknown_dir, new_filename)
-                
-                shutil.move(face_image_path, destination_path)
+                print(f"Skipping {file}: Best match {best_actor} below threshold (similarity: {best_similarity:.3f})")
     
     print("[INFO] Completed matching and moving faces.")
+
+def find_best_matches(embeddings_dict, query_embedding, top_k=1):
+    """Find the best matching embeddings based on cosine similarity."""
+    similarities = {}
+    for name, stored_embedding in embeddings_dict.items():
+        similarity = cosine_similarity(query_embedding, stored_embedding)
+        similarities[name] = similarity
+    
+    # Sort by similarity score and get top k matches
+    sorted_matches = sorted(similarities.items(), key=lambda x: x[1], reverse=True)[:top_k]
+    return sorted_matches
+
+def process_embeddings(embeddings_folder, query_embeddings):
+    """Process embeddings and find best matches."""
+    # Load all stored embeddings
+    stored_embeddings = {}
+    for embedding_file in os.listdir(embeddings_folder):
+        if embedding_file.endswith('.npy'):
+            name = os.path.splitext(embedding_file)[0]
+            embedding_path = os.path.join(embeddings_folder, embedding_file)
+            stored_embeddings[name] = np.load(embedding_path)
+    
+    # Find best match for each query embedding
+    results = []
+    for query_embedding in query_embeddings:
+        matches = find_best_matches(stored_embeddings, query_embedding)
+        if matches:
+            best_match, similarity = matches[0]
+            results.append((best_match, similarity))
+    
+    return results

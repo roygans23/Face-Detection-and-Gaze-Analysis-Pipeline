@@ -8,4 +8,6 @@ torch
 torchvision
 facenet-pytorch
 scikit-learn
-pillow
+matplotlib
+Pillow
+

@@ -1,6 +1,5 @@
 import cv2
 import os
-import json
 import numpy as np
 
 
@@ -81,82 +80,46 @@ def detect_faces(frame, net, conf_threshold=0.7, nms_threshold=0.4, margin=0.1):
     
     return faces
 
-# Creating a json from the video in the format of {FRAME_INDEX : LIST OF FACES AS TUPLES}
-def process_video(cap, output_filename, net, frame_skip=30, conf_threshold=0.7, nms_threshold=0.4):
+def process_videos_in_folder(folder_path, net, frame_skip=30, conf_threshold=0.7, nms_threshold=0.4):
     """
-    Processes a video capture to detect faces every `frame_skip` frames and saves the results to a JSON file.
-    Only frames with detected faces will be included in the JSON file.
-
-    Parameters:
-    - cap: The cv2.VideoCapture object.
-    - output_filename: The name of the JSON file to save the results. 
-    - net: The pre-loaded DNN model.
-    - frame_skip: Process every `frame_skip` frames.
-    - conf_threshold: Confidence threshold for face detection.
-    - nms_threshold: Non-Maximum Suppression threshold.
+    Processes all videos in a folder and returns a dictionary of face detections.
+    Returns: {video_name: {frame_idx: [(top_left, bottom_right), ...]}}
     """
-    face_data = {}
-    frame_index = 0  # To track the actual frame number
-
-    while True:
-        # Skip directly to the next frame to be processed
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
-        ret, frame = cap.read()
-        
-        # If the frame is not read correctly, break the loop
-        if not ret:
-            break
-
-        try:
-            # Detect faces in the current frame
-            faces = detect_faces(frame, net, conf_threshold=conf_threshold, nms_threshold=nms_threshold)
-            
-            if faces:
-                # Store results as a list of tuples (top-left and bottom-right coordinates)
-                face_data[frame_index] = [
-                    ((int(f[0][0]), int(f[0][1])), (int(f[1][0]), int(f[1][1]))) for f in faces
-                ]
-        except Exception as e:
-            print(f"Error processing frame {frame_index}: {e}")
-            pass
-        
-        # Move to the next frame to be processed
-        frame_index += frame_skip
-
-    # Release the video capture object
-    cap.release()
-
-    # Save the face detection data to a JSON file
-    with open(output_filename, "w") as f:
-        json.dump(face_data, f, indent=4)
-
-
-def process_videos_in_folder(folder_path, output_folder, net, frame_skip=30, conf_threshold=0.7, nms_threshold=0.4):
-    """
-    Processes all videos in a folder to create a JSON for each video with face detection data.
-    """
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder, exist_ok=True)
+    detection_results = {}
 
     for file_name in os.listdir(folder_path):
         if file_name.lower().endswith(('.mp4', '.avi', '.mov')):
             video_path = os.path.join(folder_path, file_name)
-            base_name, _ = os.path.splitext(file_name)
-            output_filename = os.path.join(output_folder, base_name + ".json")
-
+            video_name = os.path.splitext(file_name)[0]
+            
             cap = cv2.VideoCapture(video_path)
             if not cap.isOpened():
                 print(f"Could not open {video_path}")
                 continue
 
             print(f"Processing video: {video_path}")
-            process_video(
-                cap,
-                output_filename,
-                net,
-                frame_skip=frame_skip,
-                conf_threshold=conf_threshold,
-                nms_threshold=nms_threshold
-            )
+            frame_results = {}
+            frame_idx = 0
+
+            while True:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                ret, frame = cap.read()
+                
+                if not ret:
+                    break
+
+                try:
+                    faces = detect_faces(frame, net, conf_threshold, nms_threshold)
+                    if faces:  # Only store frames with faces
+                        frame_results[frame_idx] = faces
+                except Exception as e:
+                    print(f"Error processing frame {frame_idx}: {e}")
+                
+                frame_idx += frame_skip
+
             cap.release()
+            if frame_results:  # Only store videos with detected faces
+                detection_results[video_name] = frame_results
+
+    return detection_results
 
