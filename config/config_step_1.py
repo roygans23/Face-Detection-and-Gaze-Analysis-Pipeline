@@ -7,10 +7,10 @@ FACES_FOLDER = "data/faces"
 CSV_OUTPUTS = "data/csvs_outputs"  # For generated CSVs
 
 # --- MODEL FILES (EDIT THESE TO MATCH YOUR SYSTEM) ---
-PROTOTXT_PATH = r"utils\deploy.prototxt.txt"
-CAFFE_MODEL_PATH = r"utils\res10_300x300_ssd_iter_140000.caffemodel"
+PROTOTXT_PATH = r"utils/deploy.prototxt.txt"
+CAFFE_MODEL_PATH = r"utils/res10_300x300_ssd_iter_140000.caffemodel"
 
 # --- FACE DETECTION THRESHOLDS ---
 CONF_THRESHOLD = 0.7
 NMS_THRESHOLD = 0.4
-FRAME_SKIP = 60 
+FRAME_SKIP = 60
