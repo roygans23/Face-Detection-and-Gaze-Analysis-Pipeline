@@ -26,8 +26,8 @@ def create_dataframes_from_dict(face_detection_results):
                 data.append({
                     "frame": int(frame_idx),
                     "index_in_frame": idx + 1,
-                    "top_left": face[0],
-                    "bottom_right": face[1]
+                    "top_left": tuple(int(x) for x in face[0]),
+                    "bottom_right": tuple(int(x) for x in face[1])
                 })
 
         if data:  # Only create DataFrame if we have data
