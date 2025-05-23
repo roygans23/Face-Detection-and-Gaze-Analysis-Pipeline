@@ -8,3 +8,6 @@ data/videos/
 __pycache__/
 *.pyc
 *.pyo
+
+# Ignore trained models .pth files
+data/models/
