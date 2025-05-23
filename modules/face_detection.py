@@ -1,6 +1,7 @@
 import cv2
 import os
 import numpy as np
+from tqdm import tqdm
 
 
 #LOAD THE MODEL
@@ -97,25 +98,35 @@ def process_videos_in_folder(folder_path, net, frame_skip=30, conf_threshold=0.7
                 print(f"Could not open {video_path}")
                 continue
 
+            # Get number of frames in video
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            print(f"Total frames in {video_name}: {total_frames}")
+
+            num_of_iterations = total_frames // frame_skip + 1
+            print(f"Total frames to process in {video_name}: {num_of_iterations}")
+
             print(f"Processing video: {video_path}")
             frame_results = {}
             frame_idx = 0
 
-            while True:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-                ret, frame = cap.read()
-                
-                if not ret:
-                    break
+            with tqdm(total=num_of_iterations, desc=f"Searching for 'face-detected' frames in {video_name}", unit="frame") as pbar:
+                while True:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                    ret, frame = cap.read()
+                    
+                    if not ret:
+                        break
 
-                try:
-                    faces = detect_faces(frame, net, conf_threshold, nms_threshold)
-                    if faces:  # Only store frames with faces
-                        frame_results[frame_idx] = faces
-                except Exception as e:
-                    print(f"Error processing frame {frame_idx}: {e}")
-                
-                frame_idx += frame_skip
+                    try:
+                        faces = detect_faces(frame, net, conf_threshold, nms_threshold)
+                        if faces:  # Only store frames with faces
+                            frame_results[frame_idx] = faces
+                    except Exception as e:
+                        print(f"Error processing frame {frame_idx}: {e}")
+                    
+                    frame_idx += frame_skip
+                    # Update tqdm progress bar
+                    pbar.update(1)
 
             cap.release()
             if frame_results:  # Only store videos with detected faces

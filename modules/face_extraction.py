@@ -4,6 +4,7 @@ import os
 import cv2
 import pandas as pd 
 import numpy as np
+from tqdm import tqdm
 
 
 def save_faces_from_dataframe(video_path, face_data, output_folder="faces"):
@@ -19,15 +20,17 @@ def save_faces_from_dataframe(video_path, face_data, output_folder="faces"):
         print(f"Error: Unable to open video {video_path}")
         return
 
-    for frame_idx in sorted(face_data.index.unique()):
+    for frame_idx in tqdm(sorted(face_data.index.unique()), desc="Saving 'face-detected' frames as PNG images", unit="frame"):
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
         ret, frame = cap.read()
         if not ret:
+            tqdm.write(f"Error: Unable to read frame {frame_idx} from video {video_path}")
             continue
 
         # Get all rows for this frame
         rows_for_frame = face_data.loc[[frame_idx]] if frame_idx in face_data.index else None
         if rows_for_frame is None:
+            tqdm.write(f"Skipping frame {frame_idx} as no face data is available")
             continue
 
         # If only one row (single face), convert to DataFrame
@@ -40,6 +43,7 @@ def save_faces_from_dataframe(video_path, face_data, output_folder="faces"):
             bottom_right = row['bottom_right']
 
             if pd.isnull(index_in_frame) or top_left is None or bottom_right is None:
+                tqdm.write(f"Skipping invalid data for frame {frame_idx}, index {index_in_frame}")
                 continue
 
             (x1, y1) = top_left
@@ -53,6 +57,8 @@ def save_faces_from_dataframe(video_path, face_data, output_folder="faces"):
                 out_name = f"frame_{frame_idx}_face_{index_in_frame}.png"
                 out_path = os.path.join(output_folder, out_name)
                 cv2.imwrite(out_path, face_crop)
+            else:
+                tqdm.write(f"Skipping invalid crop of x2 > x1 & y2 > y1 for frame {frame_idx}, index {index_in_frame}")
 
     cap.release()
 
