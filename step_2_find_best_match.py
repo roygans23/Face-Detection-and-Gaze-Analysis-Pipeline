@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from modules.feature_extraction import FeatureExtraction
+from tqdm import tqdm
 
 """
 Step 2: Face Matching Pipeline
@@ -31,11 +32,14 @@ Required folder structure:
 Configuration parameters are loaded from config.py
 """
 
-def process_face_folder(folder_path, actor_embeddings, feature_extraction):
+def process_face_folder(video_name, folder_path, actor_embeddings, feature_extraction):
     """Process all faces in a folder and find best matches"""
     results = []
+
+    num_of_face_detected_frames = len(os.listdir(folder_path))
+    print(f"Number of face detected frames: {num_of_face_detected_frames}")
     
-    for image_name in os.listdir(folder_path):
+    for image_name in tqdm(os.listdir(folder_path), desc=f"Processing images for video {video_name}", unit="face-detected frame"):
         if not image_name.lower().endswith(('.png', '.jpg', '.jpeg')):
             continue
             
@@ -46,7 +50,6 @@ def process_face_folder(folder_path, actor_embeddings, feature_extraction):
         if face is None:
             print(f"Failed to extract face from {image_name}")
             continue
-        print(f"Generating embedding for {image_name}...")
             
         # Generate embedding
         face_embedding = feature_extraction.generate_embedding(face)
@@ -61,6 +64,8 @@ def process_face_folder(folder_path, actor_embeddings, feature_extraction):
             'best_match': best_actor,
             'similarity': similarity
         })
+
+    print(f"Num of processed 'faces-detected' frames from initial 'face-detected' frames: {len(results)} / {num_of_face_detected_frames}")
     
     return results
 
@@ -94,7 +99,7 @@ def main():
         print(f"\nProcessing faces for video: {video_name}")
         
         # Process faces in current video folder
-        results = process_face_folder(video_folder, actor_embeddings, feature_extraction)
+        results = process_face_folder(video_name, video_folder, actor_embeddings, feature_extraction)
         
         # Save results for current video to CSV
         print(f"\nSaving results for {video_name}...")
