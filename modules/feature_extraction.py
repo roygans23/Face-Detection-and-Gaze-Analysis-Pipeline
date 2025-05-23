@@ -8,189 +8,199 @@ from torch.nn.functional import cosine_similarity
 from facenet_pytorch import MTCNN, InceptionResnetV1
 import numpy as np
 import time
+from modules.model_training import create_model
 
+class FeatureExtraction:
+    def __init__(self, face_recognition_model_checkpoint=None, device=None):
+        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"Using device: {self.device}")
 
-# Initialize device, FaceNet, MTCNN
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-facenet = InceptionResnetV1(pretrained='vggface2').eval().to(device)
-mtcnn = MTCNN(image_size=160, margin=20, device=device)
-
-
-def extract_aligned_face(image_path):
-    """
-    Extract and align a face from an image file using MTCNN.
-    Returns a torch.Tensor or None if extraction fails.
-    """
-    try:
-        with Image.open(image_path) as img:
-            img = img.convert('RGB')
-
-            # Optionally resize if extremely large
-            if max(img.size) > 1024:
-                img.thumbnail((1024, 1024))
-
-            face = mtcnn(img)
-            if face is not None:
-                return face
-            else:
-                return None
-
-    except (OSError, IOError) as e:
-        print(f"File error with {image_path}: {e}")
-        return None
-    except MemoryError:
-        print(f"MemoryError: Unable to process {image_path}. Skipping file.")
-        return None
-    except Exception as e:
-        print(f"Unexpected error processing {image_path}: {e}")
-        return None
-
-
-def generate_embedding(face):
-    """
-    Generates a 1D embedding tensor from an aligned face using FaceNet.
-    """
-    face = face.unsqueeze(0).to(device)
-    with torch.no_grad():
-        embedding = facenet(face)
-    return embedding.squeeze(0)
-
-
-def generate_actor_embeddings(actors_ready_folder):
-    """
-    Generates face embeddings for each actor in `actors_ready_folder`.
-    Returns a dictionary: {actor_name: mean_embedding_tensor}
-    The embedding for each actor is the mean of embeddings from all their images.
-    """
-    actor_embeddings = {}
-    
-    for actor_name in os.listdir(actors_ready_folder):
-        actor_dir = os.path.join(actors_ready_folder, actor_name)
-        if not os.path.isdir(actor_dir):
-            continue
-
-        # Get all images for this actor
-        images = [f for f in os.listdir(actor_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-        if not images:
-            print(f"No images found for actor: {actor_name}")
-            continue
-
-        print(f"Processing {len(images)} images for {actor_name}")
-        embeddings_list = []
-
-        # Generate embedding for each image
-        for image_name in images:
-            image_path = os.path.join(actor_dir, image_name)
-            face = extract_aligned_face(image_path)
-            
-            if face is not None:
-                embedding = generate_embedding(face)
-                embeddings_list.append(embedding)
-
-        if embeddings_list:
-            # Calculate mean embedding
-            mean_embedding = torch.stack(embeddings_list).mean(dim=0)
-            actor_embeddings[actor_name] = mean_embedding
-            print(f"Generated mean embedding for {actor_name} from {len(embeddings_list)} images")
+        if face_recognition_model_checkpoint:
+            print(f"Loading model checkpoint from {face_recognition_model_checkpoint}")
+            self.face_recognition_model = create_model(device=self.device, model_checkpoint_path=face_recognition_model_checkpoint, pretrained=False).eval().to(self.device)
         else:
-            print(f"No valid embeddings generated for {actor_name}")
+            # Load the pre-trained FaceNet model
+            self.face_recognition_model = InceptionResnetV1(pretrained='vggface2').eval().to(self.device)
 
-    return actor_embeddings
+        self.mtcnn = MTCNN(image_size=160, margin=20, device=self.device)
+
+    def extract_aligned_face(self, image_path):
+        """
+        Extract and align a face from an image file using MTCNN.
+        Returns a torch.Tensor or None if extraction fails.
+        """
+        try:
+            with Image.open(image_path) as img:
+                img = img.convert('RGB')
+
+                # Optionally resize if extremely large
+                if max(img.size) > 1024:
+                    img.thumbnail((1024, 1024))
+
+                face = self.mtcnn(img)
+                if face is not None:
+                    return face
+                else:
+                    return None
+
+        except (OSError, IOError) as e:
+            print(f"File error with {image_path}: {e}")
+            return None
+        except MemoryError:
+            print(f"MemoryError: Unable to process {image_path}. Skipping file.")
+            return None
+        except Exception as e:
+            print(f"Unexpected error processing {image_path}: {e}")
+            return None
 
 
-def find_best_match(face_embedding, actor_embeddings, threshold=0.9):
-    """
-    Finds the best-matching actor. Always returns (best_actor, best_similarity).
-    """
-    best_similarity = -1.0
-    best_actor = None
+    def generate_embedding(self, face):
+        """
+        Generates a 1D embedding tensor from an aligned face using model_checkpoint_path passed.
+        If None, uses FaceNet pretrained model (on VGGFace2 dataset).
+        """
 
-    for actor_name, embedding in actor_embeddings.items():
-        sim = cosine_similarity(
-            face_embedding.unsqueeze(0),
-            embedding.unsqueeze(0),
-            dim=1
-        ).item()
+        face = face.unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            embedding = self.face_recognition_model(face)
+        return embedding.squeeze(0)
 
-        if sim > best_similarity:
-            best_similarity = sim
-            best_actor = actor_name
 
-    # Always return the best actor, even if similarity is below threshold
-    return best_actor, best_similarity
-
-def match_and_move_faces(faces_folder, actors_ready_folder, actor_embeddings, threshold=0.9):
-    """
-    Recursively matches each face in `faces_folder` (including subfolders) to the best actor.
-    Only moves images that meet the similarity threshold requirement.
-    Images below threshold are left in their original location.
-    """
-    for root, dirs, files in os.walk(faces_folder):
-        dirs[:] = [d for d in dirs if d.lower() != 'unknown']
+    def generate_actor_embeddings(self, actors_ready_folder):
+        """
+        Generates face embeddings for each actor in `actors_ready_folder`.
+        Returns a dictionary: {actor_name: mean_embedding_tensor}
+        The embedding for each actor is the mean of embeddings from all their images.
+        """
+        actor_embeddings = {}
         
-        for file in files:
-            if not file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                print(f"Skipping non-image file: {file}")
+        for actor_name in os.listdir(actors_ready_folder):
+            actor_dir = os.path.join(actors_ready_folder, actor_name)
+            if not os.path.isdir(actor_dir):
                 continue
-            
-            face_image_path = os.path.join(root, file)
-            
-            face = extract_aligned_face(face_image_path)
-            if face is None:
-                print(f"No face extracted from: {face_image_path}. Skipping.")
+
+            # Get all images for this actor
+            images = [f for f in os.listdir(actor_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            if not images:
+                print(f"No images found for actor: {actor_name}")
                 continue
-            
-            face_embedding = generate_embedding(face)
-            if face_embedding is None:
-                print(f"Failed to generate embedding for: {face_image_path}. Skipping.")
-                continue
-            
-            # Get best match and check against threshold
-            best_actor, best_similarity = find_best_match(face_embedding, actor_embeddings)
-            
-            # Only move files that meet the threshold requirement
-            if best_similarity >= threshold:
-                actor_dir = os.path.join(actors_ready_folder, best_actor)
-                os.makedirs(actor_dir, exist_ok=True)
+
+            print(f"Processing {len(images)} images for {actor_name}")
+            embeddings_list = []
+
+            # Generate embedding for each image
+            for image_name in images:
+                image_path = os.path.join(actor_dir, image_name)
+                face = self.extract_aligned_face(image_path)
                 
-                timestamp = int(time.time())
-                new_filename = f"{os.path.splitext(file)[0]}_{timestamp}{os.path.splitext(file)[1]}"
-                destination_path = os.path.join(actor_dir, new_filename)
-                
-                shutil.move(face_image_path, destination_path)
-                print(f"Moved {file} to {best_actor} (similarity: {best_similarity:.3f})")
+                if face is not None:
+                    embedding = self.generate_embedding(face)
+                    embeddings_list.append(embedding)
+
+            if embeddings_list:
+                # Calculate mean embedding
+                mean_embedding = torch.stack(embeddings_list).mean(dim=0)
+                actor_embeddings[actor_name] = mean_embedding
+                print(f"Generated mean embedding for {actor_name} from {len(embeddings_list)} images")
             else:
-                print(f"Skipping {file}: Best match {best_actor} below threshold (similarity: {best_similarity:.3f})")
-    
-    print("[INFO] Completed matching and moving faces.")
+                print(f"No valid embeddings generated for {actor_name}")
 
-def find_best_matches(embeddings_dict, query_embedding, top_k=1):
-    """Find the best matching embeddings based on cosine similarity."""
-    similarities = {}
-    for name, stored_embedding in embeddings_dict.items():
-        similarity = cosine_similarity(query_embedding, stored_embedding)
-        similarities[name] = similarity
-    
-    # Sort by similarity score and get top k matches
-    sorted_matches = sorted(similarities.items(), key=lambda x: x[1], reverse=True)[:top_k]
-    return sorted_matches
+        return actor_embeddings
 
-def process_embeddings(embeddings_folder, query_embeddings):
-    """Process embeddings and find best matches."""
-    # Load all stored embeddings
-    stored_embeddings = {}
-    for embedding_file in os.listdir(embeddings_folder):
-        if embedding_file.endswith('.npy'):
-            name = os.path.splitext(embedding_file)[0]
-            embedding_path = os.path.join(embeddings_folder, embedding_file)
-            stored_embeddings[name] = np.load(embedding_path)
-    
-    # Find best match for each query embedding
-    results = []
-    for query_embedding in query_embeddings:
-        matches = find_best_matches(stored_embeddings, query_embedding)
-        if matches:
-            best_match, similarity = matches[0]
-            results.append((best_match, similarity))
-    
-    return results
+
+    def find_best_match(self, face_embedding, actor_embeddings, threshold=0.9):
+        """
+        Finds the best-matching actor. Always returns (best_actor, best_similarity).
+        """
+        best_similarity = -1.0
+        best_actor = None
+
+        for actor_name, embedding in actor_embeddings.items():
+            sim = cosine_similarity(
+                face_embedding.unsqueeze(0),
+                embedding.unsqueeze(0),
+                dim=1
+            ).item()
+
+            if sim > best_similarity:
+                best_similarity = sim
+                best_actor = actor_name
+
+        # Always return the best actor, even if similarity is below threshold
+        return best_actor, best_similarity
+
+    def match_and_move_faces(self, faces_folder, actors_ready_folder, actor_embeddings, threshold=0.9):
+        """
+        Recursively matches each face in `faces_folder` (including subfolders) to the best actor.
+        Only moves images that meet the similarity threshold requirement.
+        Images below threshold are left in their original location.
+        """
+        for root, dirs, files in os.walk(faces_folder):
+            dirs[:] = [d for d in dirs if d.lower() != 'unknown']
+            
+            for file in files:
+                if not file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    print(f"Skipping non-image file: {file}")
+                    continue
+                
+                face_image_path = os.path.join(root, file)
+                
+                face = self.extract_aligned_face(face_image_path)
+                if face is None:
+                    print(f"No face extracted from: {face_image_path}. Skipping.")
+                    continue
+                
+                face_embedding = self.generate_embedding(face)
+                if face_embedding is None:
+                    print(f"Failed to generate embedding for: {face_image_path}. Skipping.")
+                    continue
+                
+                # Get best match and check against threshold
+                best_actor, best_similarity = self.find_best_match(face_embedding, actor_embeddings)
+                
+                # Only move files that meet the threshold requirement
+                if best_similarity >= threshold:
+                    actor_dir = os.path.join(actors_ready_folder, best_actor)
+                    os.makedirs(actor_dir, exist_ok=True)
+                    
+                    timestamp = int(time.time())
+                    new_filename = f"{os.path.splitext(file)[0]}_{timestamp}{os.path.splitext(file)[1]}"
+                    destination_path = os.path.join(actor_dir, new_filename)
+                    
+                    shutil.move(face_image_path, destination_path)
+                    print(f"Moved {file} to {best_actor} (similarity: {best_similarity:.3f})")
+                else:
+                    print(f"Skipping {file}: Best match {best_actor} below threshold (similarity: {best_similarity:.3f})")
+        
+        print("[INFO] Completed matching and moving faces.")
+
+    def find_best_matches(self, embeddings_dict, query_embedding, top_k=1):
+        """Find the best matching embeddings based on cosine similarity."""
+        similarities = {}
+        for name, stored_embedding in embeddings_dict.items():
+            similarity = cosine_similarity(query_embedding, stored_embedding)
+            similarities[name] = similarity
+        
+        # Sort by similarity score and get top k matches
+        sorted_matches = sorted(similarities.items(), key=lambda x: x[1], reverse=True)[:top_k]
+        return sorted_matches
+
+    def process_embeddings(self, embeddings_folder, query_embeddings):
+        """Process embeddings and find best matches."""
+        # Load all stored embeddings
+        stored_embeddings = {}
+        for embedding_file in os.listdir(embeddings_folder):
+            if embedding_file.endswith('.npy'):
+                name = os.path.splitext(embedding_file)[0]
+                embedding_path = os.path.join(embeddings_folder, embedding_file)
+                stored_embeddings[name] = np.load(embedding_path)
+        
+        # Find best match for each query embedding
+        results = []
+        for query_embedding in query_embeddings:
+            matches = self.find_best_matches(stored_embeddings, query_embedding)
+            if matches:
+                best_match, similarity = matches[0]
+                results.append((best_match, similarity))
+        
+        return results

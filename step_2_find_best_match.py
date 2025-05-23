@@ -2,12 +2,7 @@ from config.config_step_2 import *
 import os
 import numpy as np
 import pandas as pd
-from modules.feature_extraction import (
-    generate_actor_embeddings,
-    extract_aligned_face,
-    generate_embedding,
-    find_best_match
-)
+from modules.feature_extraction import FeatureExtraction
 
 """
 Step 2: Face Matching Pipeline
@@ -36,7 +31,7 @@ Required folder structure:
 Configuration parameters are loaded from config.py
 """
 
-def process_face_folder(folder_path, actor_embeddings):
+def process_face_folder(folder_path, actor_embeddings, feature_extraction):
     """Process all faces in a folder and find best matches"""
     results = []
     
@@ -47,17 +42,19 @@ def process_face_folder(folder_path, actor_embeddings):
         image_path = os.path.join(folder_path, image_name)
         
         # Extract and align face
-        face = extract_aligned_face(image_path)
+        face = feature_extraction.extract_aligned_face(image_path)
         if face is None:
+            print(f"Failed to extract face from {image_name}")
             continue
+        print(f"Generating embedding for {image_name}...")
             
         # Generate embedding
-        face_embedding = generate_embedding(face)
+        face_embedding = feature_extraction.generate_embedding(face)
         if face_embedding is None:
             continue
             
         # Find best match
-        best_actor, similarity = find_best_match(face_embedding, actor_embeddings)
+        best_actor, similarity = feature_extraction.find_best_match(face_embedding, actor_embeddings)
         
         results.append({
             'image_path': image_name,
@@ -76,10 +73,15 @@ def main():
     4. Merge face matches with locations
     """
     print("\n=== Starting Step 2: Finding Best Matches ===\n")
+
+    feature_extraction = FeatureExtraction(
+        face_recognition_model_checkpoint=MODEL_OUTPUT_PATH,
+        device=DEVICE
+    )
     
     # 1. Generate actor embeddings
     print("Generating actor embeddings...")
-    actor_embeddings = generate_actor_embeddings(ACTORS_READY_FOLDER)
+    actor_embeddings = feature_extraction.generate_actor_embeddings(ACTORS_READY_FOLDER)
     print(f"Generated embeddings for {len(actor_embeddings)} actors")
     
     # Get all video subfolders
@@ -92,7 +94,7 @@ def main():
         print(f"\nProcessing faces for video: {video_name}")
         
         # Process faces in current video folder
-        results = process_face_folder(video_folder, actor_embeddings)
+        results = process_face_folder(video_folder, actor_embeddings, feature_extraction)
         
         # Save results for current video to CSV
         print(f"\nSaving results for {video_name}...")

@@ -3,7 +3,9 @@ import torch
 # Training data paths
 ACTORS_READY_FOLDER = "data/actors_ready"  # folder containing processed actor images
 FACES_FOLDER = "data/faces"  # folder containing extracted faces to be matched
-MODEL_OUTPUT_PATH = "models/fine_tuned_vgg16.pth"  # where to save the trained model
+MODELS_DIR = "data/models"  # directory to save the trained model
+MODEL_OUTPUT_PATH = "data/models/fine_tuned_face_trained_vgg16_119_frame_skip=24.pth"  # where to save the trained model
+PRETRAINED_VGGFACE_PATH = "/home/ssd_storage/experiments/ng_ids_imgs_tradeoff/vgg_pre_trained_models/face_trained_vgg16_119.pth"
 
 # Training parameters
 BATCH_SIZE = 32

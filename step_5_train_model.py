@@ -1,32 +1,27 @@
 import torch
-from config.config_step_5 import (
-    ACTORS_READY_FOLDER,
-    FACES_FOLDER,
-    MODEL_OUTPUT_PATH,
-    BATCH_SIZE,
-    NUM_CLASSES,
-    LEARNING_RATE,
-    NUM_EPOCHS,
-    DEVICE,
-    SIMILARITY_THRESHOLD
-)
+from config.config_step_5 import *
 from modules.model_training import (
     create_dataloaders,
     create_model,
     train_model
 )
-from modules.feature_extraction import (
-    generate_actor_embeddings,
-    match_and_move_faces
-)
+
+from modules.feature_extraction import FeatureExtraction
+
+import os
 
 def main():
     print("Step 5: Training the face recognition model")
+
+    feature_extraction = FeatureExtraction(
+        face_recognition_model_checkpoint=MODEL_OUTPUT_PATH,
+        device=DEVICE
+    )
     
     # 0. Preprocess: Match and move faces
     print("Preprocessing: Matching and moving faces...")
-    actor_embeddings = generate_actor_embeddings(ACTORS_READY_FOLDER)
-    match_and_move_faces(
+    actor_embeddings = feature_extraction.generate_actor_embeddings(ACTORS_READY_FOLDER)
+    feature_extraction.match_and_move_faces(
         faces_folder=FACES_FOLDER,
         actors_ready_folder=ACTORS_READY_FOLDER,
         actor_embeddings=actor_embeddings,
@@ -44,7 +39,9 @@ def main():
     print("Initializing model...")
     model = create_model(
         num_classes=NUM_CLASSES,
-        device=DEVICE
+        device=DEVICE,
+        model_checkpoint_path=PRETRAINED_VGGFACE_PATH,
+        pretrained=False
     )
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(
@@ -66,10 +63,11 @@ def main():
     
     # 4. Save the trained model
     print(f"Saving model to {MODEL_OUTPUT_PATH}")
-    torch.save(
-        trained_model.state_dict(),
-        MODEL_OUTPUT_PATH
-    )
+
+    # Ensure the directory exists
+    os.makedirs(MODELS_DIR, exist_ok=True)
+
+    torch.save(trained_model.state_dict(), MODEL_OUTPUT_PATH)
     print("Training completed successfully!")
 
 if __name__ == "__main__":
