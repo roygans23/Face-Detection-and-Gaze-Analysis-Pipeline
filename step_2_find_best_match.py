@@ -80,7 +80,7 @@ def main():
     print("\n=== Starting Step 2: Finding Best Matches ===\n")
 
     feature_extraction = FeatureExtraction(
-        face_recognition_model_checkpoint=MODEL_OUTPUT_PATH,
+        face_recognition_model_checkpoint=FACE_RECOGNITION_MODEL_PATH,
         device=DEVICE
     )
     

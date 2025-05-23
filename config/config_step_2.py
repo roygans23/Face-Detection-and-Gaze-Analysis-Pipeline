@@ -11,7 +11,7 @@ GAZES_FOLDER = "data/gazes_csv"  # Input data folder
 CSV_OUTPUTS = "data/csvs_outputs"  # For generated CSVs
 
 # From step 5 config
-MODEL_OUTPUT_PATH = "data/models/fine_tuned_face_trained_vgg16_119_frame_skip=24.pth"  # where to save the trained model
+FACE_RECOGNITION_MODEL_PATH = "/home/ssd_storage/experiments/ng_ids_imgs_tradeoff/vgg_pre_trained_models/face_trained_vgg16_119.pth"
 
 # --- FEATURE EXTRACTION ---
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
