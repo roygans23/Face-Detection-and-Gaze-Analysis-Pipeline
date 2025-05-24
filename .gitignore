@@ -11,3 +11,6 @@ __pycache__/
 
 # Ignore trained models .pth files
 data/models/
+
+# Ignore output csv files (under csvs_outputs/ dir)
+data/csvs_outputs/
