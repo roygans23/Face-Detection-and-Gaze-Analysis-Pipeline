@@ -9,20 +9,26 @@ from facenet_pytorch import MTCNN, InceptionResnetV1
 import numpy as np
 import time
 from modules.model_training import create_model
+from tqdm import tqdm
+from modules.representation_layer_extraction import RepresentationLayerExtraction
 
 class FeatureExtraction:
-    def __init__(self, face_recognition_model_checkpoint=None, device=None):
+    def __init__(self, face_recognition_arch, embedding_layer_name, face_recognition_model_checkpoint=None, pretrained=False, data_parallel_patch=False, device=None):
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Using device: {self.device}")
 
-        if face_recognition_model_checkpoint:
-            print(f"Loading model checkpoint from {face_recognition_model_checkpoint}")
-            self.face_recognition_model = create_model(device=self.device, model_checkpoint_path=face_recognition_model_checkpoint, pretrained=False).eval().to(self.device)
-        else:
-            # Load the pre-trained FaceNet model
-            self.face_recognition_model = InceptionResnetV1(pretrained='vggface2').eval().to(self.device)
+        # if face_recognition_model_checkpoint:
+        # print(f"Loading model checkpoint from {face_recognition_model_checkpoint}")
+        # else:
+        #     # Load the pre-trained FaceNet model
+        #     self.face_recognition_model = InceptionResnetV1(pretrained='vggface2').eval().to(self.device)
+        #     print("Using pre-trained ResNet FaceNet model (InceptionResnetV1)")
 
         self.mtcnn = MTCNN(image_size=160, margin=20, device=self.device)
+
+        face_recognition_model = create_model(device=self.device, model_arch=face_recognition_arch, model_checkpoint_path=face_recognition_model_checkpoint,
+         pretrained=pretrained, train_mode=False, data_parallel_patch=data_parallel_patch).eval().to(self.device)
+        self.representationLayerExtractor = RepresentationLayerExtraction(face_recognition_model, target_layer_name=embedding_layer_name)
 
     def extract_aligned_face(self, image_path):
         """
@@ -62,7 +68,7 @@ class FeatureExtraction:
 
         face = face.unsqueeze(0).to(self.device)
         with torch.no_grad():
-            embedding = self.face_recognition_model(face)
+            embedding = self.representationLayerExtractor.extract_representation(face)
         return embedding.squeeze(0)
 
 
@@ -138,21 +144,21 @@ class FeatureExtraction:
         for root, dirs, files in os.walk(faces_folder):
             dirs[:] = [d for d in dirs if d.lower() != 'unknown']
             
-            for file in files:
+            for file in tqdm(files, desc=f"Processing {root}", unit="face frame .PNG"):
                 if not file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    print(f"Skipping non-image file: {file}")
+                    tqdm.write(f"Skipping non-image file: {file}")
                     continue
                 
                 face_image_path = os.path.join(root, file)
                 
                 face = self.extract_aligned_face(face_image_path)
                 if face is None:
-                    print(f"No face extracted from: {face_image_path}. Skipping.")
+                    tqdm.write(f"No face extracted from: {face_image_path}. Skipping.")
                     continue
                 
                 face_embedding = self.generate_embedding(face)
                 if face_embedding is None:
-                    print(f"Failed to generate embedding for: {face_image_path}. Skipping.")
+                    tqdm.write(f"Failed to generate embedding for: {face_image_path}. Skipping.")
                     continue
                 
                 # Get best match and check against threshold
@@ -168,9 +174,9 @@ class FeatureExtraction:
                     destination_path = os.path.join(actor_dir, new_filename)
                     
                     shutil.move(face_image_path, destination_path)
-                    print(f"Moved {file} to {best_actor} (similarity: {best_similarity:.3f})")
+                    tqdm.write(f"Moved {file} to {best_actor} (similarity: {best_similarity:.3f})")
                 else:
-                    print(f"Skipping {file}: Best match {best_actor} below threshold (similarity: {best_similarity:.3f})")
+                    tqdm.write(f"Skipping {file}: Best match {best_actor} below threshold (similarity: {best_similarity:.3f})")
         
         print("[INFO] Completed matching and moving faces.")
 
