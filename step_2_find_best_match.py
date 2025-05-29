@@ -48,7 +48,7 @@ def process_face_folder(video_name, folder_path, actor_embeddings, feature_extra
         # Extract and align face
         face = feature_extraction.extract_aligned_face(image_path)
         if face is None:
-            print(f"Failed to extract face from {image_name}")
+            tqdm.write(f"Failed to extract face from {image_name}")
             continue
             
         # Generate embedding
@@ -80,8 +80,12 @@ def main():
     print("\n=== Starting Step 2: Finding Best Matches ===\n")
 
     feature_extraction = FeatureExtraction(
-        face_recognition_model_checkpoint=FACE_RECOGNITION_MODEL_PATH,
-        device=DEVICE
+        face_recognition_model_checkpoint=None,
+        face_recognition_arch='vgg',
+        device=DEVICE,
+        pretrained=True,
+        embedding_layer_name=VGG_EMBEDDING_LAYER_NAME,
+        data_parallel_patch=True
     )
     
     # 1. Generate actor embeddings
