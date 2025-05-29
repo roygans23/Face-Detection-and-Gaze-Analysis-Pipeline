@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, random_split
 import numpy as np
 from modules.fine_tuned_inception_resnet import FineTuneInceptionResnet
 from facenet_pytorch import InceptionResnetV1
+from utils.tensorboard_utils import TensorboardLogger
 
 def create_dataloaders(data_dir, batch_size=32, model_arch='vgg'):
     """
@@ -131,67 +132,66 @@ def train_model(model, criterion, optimizer, train_loader, val_loader, device, n
         print("Using OneCycleLR scheduler for learning rate adjustment.")
 
     # Create tensorboard writer
-    writer = init_tensorboard_writer('tensorboard_logs/citizen4_LabPretrainedVGG16_FINETUNED')
+    with TensorboardLogger('tensorboard_logs/citizen4_LabPretrainedVGG16_FINETUNED') as writer:
+        for epoch in range(num_epochs):
+            print(f"Epoch {epoch + 1}/{num_epochs}")
+            print("-" * 10)
 
-    for epoch in range(num_epochs):
-        print(f"Epoch {epoch + 1}/{num_epochs}")
-        print("-" * 10)
+            # Training phase
+            model.train()
+            train_loss = 0.0
+            train_corrects = 0
 
-        # Training phase
-        model.train()
-        train_loss = 0.0
-        train_corrects = 0
-
-        for inputs, labels in train_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
-            optimizer.zero_grad()
-
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            _, preds = torch.max(outputs, 1)
-
-            loss.backward()
-            optimizer.step()
-
-            if lr_scheduler:
-                # Update learning rate
-                lr_scheduler.step()
-
-            train_loss += loss.item() * inputs.size(0)
-            train_corrects += torch.sum(preds == labels.data)
-
-        train_loss = train_loss / len(train_loader.dataset)
-        train_acc = train_corrects.double() / len(train_loader.dataset)
-
-        # Validation phase
-        model.eval()
-        val_loss = 0.0
-        val_corrects = 0
-
-        with torch.no_grad():
-            for inputs, labels in val_loader:
+            for inputs, labels in train_loader:
                 inputs, labels = inputs.to(device), labels.to(device)
+                optimizer.zero_grad()
 
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
                 _, preds = torch.max(outputs, 1)
 
-                val_loss += loss.item() * inputs.size(0)
-                val_corrects += torch.sum(preds == labels.data)
+                loss.backward()
+                optimizer.step()
 
-        val_loss = val_loss / len(val_loader.dataset)
-        val_acc = val_corrects.double() / len(val_loader.dataset)
+                if lr_scheduler:
+                    # Update learning rate
+                    lr_scheduler.step()
 
-        print(f"Current Learning Rate: {lr_scheduler.get_last_lr()[0] if lr_scheduler else optimizer.param_groups[0]['lr']:.6f}")
-        print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
-        print(f"Val Loss:   {val_loss:.4f}, Val Acc:   {val_acc:.4f}")
+                train_loss += loss.item() * inputs.size(0)
+                train_corrects += torch.sum(preds == labels.data)
 
-        # Log to TensorBoard
-        log_scalar(writer, 'train/train_loss (per epoch)', train_loss, epoch+1)
-        log_scalar(writer, 'train/train_accuracy (per epoch)', train_acc.item(), epoch+1)
-        log_scalar(writer, 'val/val_loss (per epoch)', val_loss, epoch+1)
-        log_scalar(writer, 'val/val_accuracy (per epoch)', val_acc.item(), epoch+1)
-        print(f"Written Loss+Acc logs to Tensorboard")
+            train_loss = train_loss / len(train_loader.dataset)
+            train_acc = train_corrects.double() / len(train_loader.dataset)
+
+            # Validation phase
+            model.eval()
+            val_loss = 0.0
+            val_corrects = 0
+
+            with torch.no_grad():
+                for inputs, labels in val_loader:
+                    inputs, labels = inputs.to(device), labels.to(device)
+
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
+                    _, preds = torch.max(outputs, 1)
+
+                    val_loss += loss.item() * inputs.size(0)
+                    val_corrects += torch.sum(preds == labels.data)
+
+            val_loss = val_loss / len(val_loader.dataset)
+            val_acc = val_corrects.double() / len(val_loader.dataset)
+
+            print(f"Current Learning Rate: {lr_scheduler.get_last_lr()[0] if lr_scheduler else optimizer.param_groups[0]['lr']:.6f}")
+            print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            print(f"Val Loss:   {val_loss:.4f}, Val Acc:   {val_acc:.4f}")
+
+            # Log to TensorBoard
+            writer.log_scalar('train/train_loss (per epoch)', train_loss, epoch+1)
+            writer.log_scalar('train/train_accuracy (per epoch)', train_acc.item(), epoch+1)
+            writer.log_scalar('val/val_loss (per epoch)', val_loss, epoch+1)
+            writer.log_scalar('val/val_accuracy (per epoch)', val_acc.item(), epoch+1)
+            print(f"Written Loss+Acc logs to Tensorboard")
 
     print("Training completed.")
     return model
