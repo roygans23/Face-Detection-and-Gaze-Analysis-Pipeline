@@ -14,3 +14,6 @@ data/models/
 
 # Ignore output csv files (under csvs_outputs/ dir)
 data/csvs_outputs/
+
+# Ignore tensorboard log files (events.out.tfevents)
+tensorboard_logs/
