@@ -186,6 +186,9 @@ def train_model(model, criterion, optimizer, train_loader, val_loader, device, n
             print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
             print(f"Val Loss:   {val_loss:.4f}, Val Acc:   {val_acc:.4f}")
 
+            # Log model layer weights to check if they're learnable
+            log_param_norms(model, writer, epoch)
+
             # Log to TensorBoard
             writer.log_scalar('train/train_loss (per epoch)', train_loss, epoch+1)
             writer.log_scalar('train/train_accuracy (per epoch)', train_acc.item(), epoch+1)
@@ -281,3 +284,9 @@ def display_params_grad_calc_status(model):
     print("Parameter gradient calculation status:")
     for name, param in model.named_parameters():
         print(f"Param {name} has gradient calculation {'ENABLED' if param.requires_grad else 'DISABLED'}")
+
+def log_param_norms(model, writer, epoch):
+    for name, param in model.named_parameters():
+        module_name = name.split('.')[0]  # Get the top-level module name, e.g., 'logits'
+        param_norm = param.data.norm(2).item()
+        writer.log_scalar(f'param_norms/{module_name}/{name}', param_norm, epoch + 1)
