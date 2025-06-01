@@ -8,26 +8,28 @@ from torch.nn.functional import cosine_similarity
 from facenet_pytorch import MTCNN, InceptionResnetV1
 import numpy as np
 import time
-from modules.model_training import create_model
+from modules.model_training import create_model, copy_batchnorm_stats
 from tqdm import tqdm
 from modules.representation_layer_extraction import RepresentationLayerExtraction
 
 class FeatureExtraction:
-    def __init__(self, face_recognition_arch, embedding_layer_name, face_recognition_model_checkpoint=None, pretrained=False, data_parallel_patch=False, device=None):
+    def __init__(self, face_recognition_arch, embedding_layer_name, face_recognition_model_checkpoint=None, pretrained=False, data_parallel_patch=False, device=None, copy_batchnorm_stats_from_pretrained=False):
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Using device: {self.device}")
-
-        # if face_recognition_model_checkpoint:
-        # print(f"Loading model checkpoint from {face_recognition_model_checkpoint}")
-        # else:
-        #     # Load the pre-trained FaceNet model
-        #     self.face_recognition_model = InceptionResnetV1(pretrained='vggface2').eval().to(self.device)
-        #     print("Using pre-trained ResNet FaceNet model (InceptionResnetV1)")
 
         self.mtcnn = MTCNN(image_size=160, margin=20, device=self.device)
 
         face_recognition_model = create_model(device=self.device, model_arch=face_recognition_arch, model_checkpoint_path=face_recognition_model_checkpoint,
-         pretrained=pretrained, train_mode=False, data_parallel_patch=data_parallel_patch).eval().to(self.device)
+            pretrained=pretrained, train_mode=False, data_parallel_patch=data_parallel_patch, freeze_grads=True).eval()
+        
+        resnet_pretrained = InceptionResnetV1(pretrained='vggface2').eval().to(self.device)
+
+        # Copy BatchNorm running_mean & running_var of the pretrained model to the loaded custom model (for case that only classifier head was trained and other layers were frozen)
+        if copy_batchnorm_stats_from_pretrained:
+            print(f"Copying BN stats of pretrained to custom model")
+            pretrained_model = create_model(device=self.device, model_arch=face_recognition_arch, pretrained=True, train_mode=False)
+            copy_batchnorm_stats(pretrained_model, face_recognition_model)
+
         self.representationLayerExtractor = RepresentationLayerExtraction(face_recognition_model, target_layer_name=embedding_layer_name)
 
     def extract_aligned_face(self, image_path):

@@ -290,3 +290,10 @@ def log_param_norms(model, writer, epoch):
         module_name = name.split('.')[0]  # Get the top-level module name, e.g., 'logits'
         param_norm = param.data.norm(2).item()
         writer.log_scalar(f'param_norms/{module_name}/{name}', param_norm, epoch + 1)
+
+# Copy BN stats (running_mean + running_var) of source_model into target_model
+def copy_batchnorm_stats(source_model, target_model):
+    for (name1, module1), (name2, module2) in zip(source_model.named_modules(), target_model.named_modules()):
+        if isinstance(module1, torch.nn.BatchNorm2d):
+            module2.running_mean.data.copy_(module1.running_mean.data)
+            module2.running_var.data.copy_(module1.running_var.data)
