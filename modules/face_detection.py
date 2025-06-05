@@ -111,7 +111,7 @@ def process_videos_in_folder(folder_path, net, frame_skip=30, conf_threshold=0.7
 
             with tqdm(total=num_of_iterations, desc=f"Searching for 'face-detected' frames in {video_name}", unit="frame") as pbar:
                 while True:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, int(round(frame_idx)))
                     ret, frame = cap.read()
                     
                     if not ret:
@@ -120,7 +120,7 @@ def process_videos_in_folder(folder_path, net, frame_skip=30, conf_threshold=0.7
                     try:
                         faces = detect_faces(frame, net, conf_threshold, nms_threshold)
                         if faces:  # Only store frames with faces
-                            frame_results[frame_idx] = faces
+                            frame_results[int(round(frame_idx))] = faces
                     except Exception as e:
                         print(f"Error processing frame {frame_idx}: {e}")
                     
