@@ -62,8 +62,64 @@ def get_data_transforms(model_type='vgg'):
 def create_model(num_classes = 1000, device='cpu', model_arch='vgg', model_checkpoint_path=None,
                  pretrained=True, train_mode=True, freeze_grads=False, data_parallel_patch=False,
                  additional_trainable_keywords=None):
+    
     """
-    Loads a pre-trained VGG16 and modifies the final layer to match num_classes.
+    Creates and returns a deep learning model (e.g., VGG16) configured for training or evaluation.
+
+    This function supports loading a base model architecture (e.g., VGG), optionally loading a checkpoint,
+    modifying the classifier head to match the number of target classes, applying gradient freezing, and 
+    preparing the model for training or evaluation.
+
+    Parameters:
+    ----------
+    num_classes : int, optional (default=1000)
+        Number of output classes for the classifier head.
+
+    device : str, optional (default='cpu')
+        The device to load the model onto (e.g., 'cpu' or 'cuda').
+
+    model_arch : str, optional (default='vgg')
+        Model architecture to use (e.g., 'vgg', 'resnet', etc.).
+        This should be supported by `build_base_model`.
+
+    model_checkpoint_path : str or None, optional (default=None)
+        Path to a saved checkpoint file. If provided, the function will attempt to load the model weights
+        from the checkpoint.
+
+    pretrained : bool, optional (default=True)
+        Whether to initialize the base model with pretrained weights (e.g., ImageNet weights).
+
+    train_mode : bool, optional (default=True)
+        If True, the model will be prepared for training (e.g., classifier head will be replaced).
+        If False, the model will be set up for inference (e.g., classifier head matched to checkpoint).
+
+    freeze_grads : bool, optional (default=False)
+        If True and in train_mode, gradients in the base layers will be frozen, keeping only the 
+        classifier head (and any specified layers passed in 'additional_trainable_keywords' param) trainable.
+
+    data_parallel_patch : bool, optional (default=False)
+        If True, wraps the feature extractor portion of the model in `torch.nn.DataParallel`.
+        Useful for loading checkpoints that were saved using DataParallel (Relevant for Idan's pretrained VGG16 model, trained on VGGFace2 dataset)
+
+    additional_trainable_keywords : list of str or None, optional (default=None)
+        List of substrings to identify additional model layers (besides the classifier head) 
+        that should remain trainable when `freeze_grads=True`. Unfreezed the gradient calculation of these layers.
+
+    Returns:
+    -------
+    model : torch.nn.Module
+        The constructed model, moved to the specified device, with classifier head and training/evaluation
+        settings as configured.
+
+    Behavior:
+    --------
+    - Loads a base model via `build_base_model()`.
+    - If a checkpoint is provided (.pth file), loads weights from it:
+        - In training mode: loads all but the classifier head and replaces it (creates new classifier head layer for CrossEntropyLoss finetuning classification).
+        - In eval mode: loads entire state_dict and adjusts classifier shape accordingly.
+    - Optionally freezes all gradients except those in the classifier head and `additional_trainable_keywords` (explicit layers).
+    - Prints out gradient status and parameter names for inspection.
+
     """
     print(f"Creating model with architecture: {model_arch}, num_classes: {num_classes}, device: {device}, pretrained: {pretrained}, Mode: {'Train' if train_mode else 'Eval'}, freeze_grads: {freeze_grads}...")
     
