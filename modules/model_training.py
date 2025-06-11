@@ -172,6 +172,8 @@ def create_model(num_classes = 1000, device='cpu', model_arch='vgg', model_check
         print(f"Freezing gradients for all layers except classifier head and {additional_trainable_keywords}")
         freeze_base_layer_grads(model, model_arch, additional_trainable_keywords)
 
+    print_conv_named_parameters(model)
+
     # Display parameter gradient calculation status
     display_params_grad_calc_status(model)
 
@@ -367,3 +369,15 @@ def copy_batchnorm_stats(source_model, target_model):
         if isinstance(module1, torch.nn.BatchNorm2d):
             module2.running_mean.data.copy_(module1.running_mean.data)
             module2.running_var.data.copy_(module1.running_var.data)
+
+def print_conv_named_parameters(model):
+    """
+    Prints all named parameters in the model that belong to Conv2d layers.
+    """
+    print('Printing all Convolutional layers in model')
+
+    for module_name, module in model.named_modules():
+        if isinstance(module, torch.nn.Conv2d):
+            for param_name, _ in module.named_parameters(recurse=False):
+                full_name = f"{module_name}.{param_name}" if module_name else param_name
+                print(full_name)
