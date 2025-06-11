@@ -61,7 +61,7 @@ def get_data_transforms(model_type='vgg'):
 
 def create_model(num_classes = 1000, device='cpu', model_arch='vgg', model_checkpoint_path=None,
                  pretrained=True, train_mode=True, freeze_grads=False, data_parallel_patch=False,
-                 additional_trainable_keywords=None):
+                 additional_trainable_keywords=None, show_inspection_logs=False):
     
     """
     Creates and returns a deep learning model (e.g., VGG16) configured for training or evaluation.
@@ -104,6 +104,10 @@ def create_model(num_classes = 1000, device='cpu', model_arch='vgg', model_check
     additional_trainable_keywords : list of str or None, optional (default=None)
         List of substrings to identify additional model layers (besides the classifier head) 
         that should remain trainable when `freeze_grads=True`. Unfreezed the gradient calculation of these layers.
+
+    show_inspection_logs : bool, optional (default=False)
+    If True, prints inspection details such as extra checkpoint data of model, layer gradient freezing status and convolutional layers
+    Useful for finetuning model, based on these inseption details of the model
 
     Returns:
     -------
@@ -163,8 +167,9 @@ def create_model(num_classes = 1000, device='cpu', model_arch='vgg', model_check
 
             print(f"Adjusted classifier head for evaluation using checkpoint's output shape.")
 
-        # Display metadata from the checkpoint
-        display_checkpoint_metadata(model_checkpoint)
+        if show_inspection_logs:
+            # Display metadata from the checkpoint
+            display_checkpoint_metadata(model_checkpoint)
 
     # Freeze model's base layer gradients if specified (to keep pre-trained 'learned' features intact), except classifier head
     # 'additional_trainable_keywords': list of layer name substrings you want to unfreeze besides classifier head
@@ -172,10 +177,9 @@ def create_model(num_classes = 1000, device='cpu', model_arch='vgg', model_check
         print(f"Freezing gradients for all layers except classifier head and {additional_trainable_keywords}")
         freeze_base_layer_grads(model, model_arch, additional_trainable_keywords)
 
-    print_conv_named_parameters(model)
-
-    # Display parameter gradient calculation status
-    display_params_grad_calc_status(model)
+    if show_inspection_logs:
+        print_conv_named_parameters(model) # display convolutional layers in model for better finetuning and unfreezing grads
+        display_params_grad_calc_status(model) # Display parameter gradient calculation status
 
     # Move to device
     model = model.to(device)
