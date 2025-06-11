@@ -59,8 +59,9 @@ def get_data_transforms(model_type='vgg'):
     }
     return data_transforms
 
-def create_model(num_classes = 1000, device='cpu', model_arch='vgg', model_checkpoint_path=None, pretrained=True, train_mode=True, freeze_grads=False, data_parallel_patch=False):
-    
+def create_model(num_classes = 1000, device='cpu', model_arch='vgg', model_checkpoint_path=None,
+                 pretrained=True, train_mode=True, freeze_grads=False, data_parallel_patch=False,
+                 additional_trainable_keywords=None):
     """
     Loads a pre-trained VGG16 and modifies the final layer to match num_classes.
     """
@@ -110,9 +111,10 @@ def create_model(num_classes = 1000, device='cpu', model_arch='vgg', model_check
         display_checkpoint_metadata(model_checkpoint)
 
     # Freeze model's base layer gradients if specified (to keep pre-trained 'learned' features intact), except classifier head
+    # 'additional_trainable_keywords': list of layer name substrings you want to unfreeze besides classifier head
     if freeze_grads and train_mode:
-        print("Freezing gradients for all layers except classifier head.")
-        freeze_base_layer_grads(model, model_arch)
+        print(f"Freezing gradients for all layers except classifier head and {additional_trainable_keywords}")
+        freeze_base_layer_grads(model, model_arch, additional_trainable_keywords)
 
     # Display parameter gradient calculation status
     display_params_grad_calc_status(model)
@@ -257,12 +259,16 @@ def display_checkpoint_metadata(model_checkpoint):
     if 'optimizer' in model_checkpoint:
         print(f"Optimizer state from checkpoint: {model_checkpoint['optimizer']['param_groups']}")
 
-def freeze_base_layer_grads(model, arch):
+def freeze_base_layer_grads(model, arch, additional_trainable_keywords=None):
     """
-    Freezes all model parameters.
+    Freezes all model parameters except the classifier head and optionally additional layers.
+
+    Parameters:
+    - model: torch.nn.Module
+    - arch: str, e.g., 'vgg' or 'resnet'
+    - additional_trainable_keywords: list of str (optional),
+        e.g., ['block8', 'last_linear'] to also unfreeze those layers
     """
-    # Optionally freeze gradients of all layers except classifier
-    print("Freezing gradients for all layers except classifier head.")
 
     if arch == 'vgg':
         classifier_head_name = 'classifier.6'
@@ -271,11 +277,19 @@ def freeze_base_layer_grads(model, arch):
     else:
         raise ValueError(f"Unsupported model architecture: {arch}")
 
+    # Combine classifier name with optional additional layers
+    trainable_keywords = [classifier_head_name]
+    if additional_trainable_keywords:
+        trainable_keywords += additional_trainable_keywords
+        print(f" and additional layers: {additional_trainable_keywords}")
+    else:
+        print(".")
+
     for name, param in model.named_parameters():
-        if classifier_head_name not in name:
-            param.requires_grad = False
-        else:
+        if any(k in name for k in trainable_keywords):
             param.requires_grad = True
+        else:
+            param.requires_grad = False
 
 def display_params_grad_calc_status(model):
     """
