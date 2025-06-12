@@ -1,10 +1,11 @@
 import torch
+from config.model_config import ModelConfig
 
 # Training data paths
 ACTORS_READY_FOLDER = "data/actors_ready"  # folder containing processed actor images
 FACES_FOLDER = "data/faces"  # folder containing extracted faces to be matched
 MODELS_DIR = "data/models"  # directory to save the trained model
-MODEL_OUTPUT_PATH = "data/models/citizen4_vgg16_lab_finetuned_frame_step=24_lr_sched.pth"  # where to save the trained model
+MODEL_OUTPUT_PATH = "data/models/citizen4_citizen4_LabPretrainedVGG16_unfreeze_last_3_layers.pth"  # where to save the trained model
 PRETRAINED_VGGFACE_PATH = "/home/ssd_storage/experiments/ng_ids_imgs_tradeoff/vgg_pre_trained_models/face_trained_vgg16_119.pth"
 
 # Training parameters
@@ -26,3 +27,16 @@ RESNET_EMBEDDING_LAYER_NAME = 'last_bn'
 # # Tensorboard Logging
 # LOG_BASE_DIR = "./logs"
 # RUN_NAME = 'Citizen4_Lab_VGG16_FINE_TUNED_FREEZE_GRADS'
+
+TRAIN_MODEL_CONFIG = ModelConfig(
+    arch="resnet",
+    num_classes=NUM_CLASSES,
+    pretrained=True,
+    train_mode=True,
+    device=DEVICE,
+    checkpoint_path=None,
+    freeze_grads=True,
+    additional_trainable_keywords=None,
+    data_parallel_patch=False,
+    show_logs=True
+)

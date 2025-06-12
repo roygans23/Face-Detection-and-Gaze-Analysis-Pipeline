@@ -1,11 +1,16 @@
 import torch
 from torch.optim.lr_scheduler import OneCycleLR
 from config.config_step_5 import *
-from modules.model_training import (
-    create_dataloaders,
-    create_model,
-    train_model
-)
+
+from config.config_step_2 import FACE_RECOGNITION_MODEL_CONFIG
+
+from config.model_config import ModelConfig
+from config.inference_model_config import InferenceModelConfig
+from config.trainer_config import TrainerConfig
+
+from modules.model_builder import ModelBuilder
+from utils.data_utils import create_dataloaders
+from modules.model_training import train_model
 
 from modules.feature_extraction import FeatureExtraction
 
@@ -13,14 +18,7 @@ import os
 
 def main():
     print("Step 5: Training the face recognition model")
-
-    feature_extraction = FeatureExtraction(
-        face_recognition_model_checkpoint=None,
-        face_recognition_arch='resnet',
-        pretrained=True,
-        device=DEVICE,
-        embedding_layer_name=RESNET_EMBEDDING_LAYER_NAME
-    )
+    feature_extraction = FeatureExtraction(model_config=FACE_RECOGNITION_MODEL_CONFIG)
     
     # 0. Preprocess: Match and move faces
     print("Preprocessing: Matching and moving faces...")
@@ -42,21 +40,12 @@ def main():
     
     # 2. Initialize model, criterion, and optimizer
     print("Initializing model...")
-    model = create_model(
-        num_classes=NUM_CLASSES,
-        device=DEVICE,
-        model_arch='vgg',
-        model_checkpoint_path=PRETRAINED_VGGFACE_PATH,
-        pretrained=True,
-        train_mode=True,
-        freeze_grads=False,
-        data_parallel_patch=True
-    )
+
+    model_builder = ModelBuilder(TRAIN_MODEL_CONFIG)
+    model = model_builder.initialize_model()
+
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=LEARNING_RATE
-    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     # Optionally, add a learning rate scheduler
     lr_scheduler=OneCycleLR(
@@ -66,18 +55,23 @@ def main():
             epochs=NUM_EPOCHS,
             anneal_strategy=ANNEAL_STRATEGY
         )
-    
+
+    trainer_config = TrainerConfig(
+    device=DEVICE,
+    num_epochs=NUM_EPOCHS,
+    criterion=criterion,
+    optimizer=optimizer,
+    lr_scheduler=lr_scheduler,
+    log_dir='tensorboard_logs/refactored_resnet_pretrained')
+
     # 3. Train the model
     print("Starting training...")
+
     trained_model = train_model(
         model=model,
-        criterion=criterion,
-        optimizer=optimizer,
         train_loader=train_loader,
         val_loader=val_loader,
-        device=DEVICE,
-        num_epochs=NUM_EPOCHS,
-        lr_scheduler=lr_scheduler
+        config=trainer_config
     )
     
     # 4. Save the trained model

@@ -79,14 +79,7 @@ def main():
     """
     print("\n=== Starting Step 2: Finding Best Matches ===\n")
 
-    feature_extraction = FeatureExtraction(
-        face_recognition_model_checkpoint=None,
-        face_recognition_arch='vgg',
-        device=DEVICE,
-        pretrained=True,
-        embedding_layer_name=VGG_EMBEDDING_LAYER_NAME,
-        data_parallel_patch=True
-    )
+    feature_extraction = FeatureExtraction(model_config=FACE_RECOGNITION_MODEL_CONFIG)
     
     # 1. Generate actor embeddings
     print("Generating actor embeddings...")
